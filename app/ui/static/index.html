@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NEXUS | Local Operations</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">N</span><div><strong>NEXUS</strong><small>LOCAL OPERATIONS</small></div></div>
+    <div class="connection"><span class="pulse"></span><span id="local-status">LOCAL / IDLE</span></div>
+  </header>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Navigation">
+      <div class="eyebrow">CONTROL ROOM</div>
+      <nav>
+        <button class="nav-item active" data-section="overview">Overview</button>
+        <button class="nav-item" data-section="tasks">Tasks</button>
+        <button class="nav-item" data-section="investigation">Investigation</button>
+        <button class="nav-item" data-section="security">Security</button>
+        <button class="nav-item" data-section="approvals">Approvals <span id="approval-count" class="count">0</span></button>
+        <button class="nav-item" data-section="audit">Audit trail</button>
+      </nav>
+      <div class="sidebar-foot"><span>BOUNDARY</span><strong>127.0.0.1</strong><small>Risk and approval gates remain active.</small></div>
+    </aside>
+    <main class="main">
+      <section id="overview" class="view active-view">
+        <div class="section-head"><div><div class="eyebrow">NEXUS / OVERVIEW</div><h1>Operations at a glance</h1></div><button id="refresh" class="button secondary">Refresh data</button></div>
+        <div class="hero-line"><div><span class="status-dot"></span><strong id="hero-status">IDLE</strong><span class="muted"> local agent state</span></div><span class="muted">Auto-refresh is bounded and local.</span></div>
+        <div class="metric-grid"><article class="metric"><span>Pending approvals</span><strong id="metric-approvals">0</strong><small>Awaiting human decision</small></article><article class="metric"><span>Evidence items</span><strong id="metric-evidence">0</strong><small>Normalized current context</small></article><article class="metric"><span>Security</span><strong id="metric-security">SCANNER_UNAVAILABLE</strong><small>Scanner state</small></article><article class="metric"><span>Verification</span><strong id="metric-verification">—</strong><small>Most recent outcome</small></article></div>
+        <div class="split-grid"><article class="panel"><div class="panel-head"><h2>Recent activity</h2><span class="tag">AUDIT</span></div><div id="activity" class="activity-list"></div></article><article class="panel"><div class="panel-head"><h2>Security posture</h2><span id="security-tag" class="tag neutral">LOCAL</span></div><div id="security-summary" class="security-summary"></div></article></div>
+      </section>
+      <section id="tasks" class="view"><div class="section-head"><div><div class="eyebrow">LOCAL TASK INTERFACE</div><h1>Tasks</h1></div><button class="button secondary refresh-action">Refresh</button></div><div class="panel"><div class="panel-head"><h2>New task</h2><span class="tag">STATEGRAPH</span></div><div class="task-submit"><input id="task-input" type="text" maxlength="2000" placeholder="Enter task... e.g. Inspect my workspace and summarize the project structure." aria-label="Natural-language task"><button id="task-run" class="button">RUN NEXUS</button></div><div id="task-submit-note" class="muted"></div></div><div class="panel"><div class="panel-head"><h2>Current task</h2><span class="tag">DURABLE</span></div><div id="task-current" class="task-current"></div></div><div class="split-grid lower"><article class="panel"><div class="panel-head"><h2>Plan &amp; progress</h2><span class="tag">SUBGOALS</span></div><div id="task-plan"></div></article><article class="panel"><div class="panel-head"><h2>Security &amp; verification</h2><span class="tag">GATES</span></div><div id="task-security"></div></article></div><div class="panel"><div class="panel-head"><h2>History</h2><span class="tag">LEDGER</span></div><div id="task-history" class="activity-list"></div></div></section>
+      <section id="investigation" class="view"><div class="section-head"><div><div class="eyebrow">CURRENT CONTEXT</div><h1>Investigation</h1></div><button class="button secondary refresh-action">Refresh</button></div><div class="panel"><div class="panel-head"><h2>Normalized evidence</h2><span class="tag">OBSERVED</span></div><div id="evidence-list" class="evidence-list"></div></div><div class="split-grid lower"><article class="panel"><div class="panel-head"><h2>Correlations</h2><span class="tag">RELATIONSHIPS</span></div><div id="correlations"></div></article><article class="panel"><div class="panel-head"><h2>Conflicts</h2><span class="tag warning">REVIEW</span></div><div id="conflicts"></div></article></div></section>
+      <section id="security" class="view"><div class="section-head"><div><div class="eyebrow">LOCAL SIGNALS</div><h1>Security</h1></div><button class="button secondary refresh-action">Refresh</button></div><div id="security-view" class="panel"></div><div class="panel"><div class="panel-head"><h2>User DNA</h2><span class="tag">READ-ONLY</span></div><div id="dna-list" class="evidence-list"></div><p class="muted">Preferences personalize; they never authorize. Only explicit authorization records gate sensitive access.</p></div><p class="notice">A clean scan does not guarantee that the system is completely safe.</p></section>
+      <section id="approvals" class="view"><div class="section-head"><div><div class="eyebrow">HUMAN GATE</div><h1>Approvals</h1></div><button class="button secondary refresh-action">Refresh</button></div><div id="approvals-list" class="approval-list"></div></section>
+      <section id="audit" class="view"><div class="section-head"><div><div class="eyebrow">LOCAL RECORD</div><h1>Audit trail</h1></div><button class="button secondary refresh-action">Refresh</button></div><div id="audit-list" class="audit-list"></div></section>
+    </main>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

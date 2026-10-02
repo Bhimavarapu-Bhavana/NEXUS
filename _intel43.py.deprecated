@@ -1,0 +1,112 @@
+from __future__ import annotations
+
+"""Temporary Phase 43 introspection helper."""
+
+import json
+
+import app.calendar.service as cal
+import app.comms.service as comms
+import app.email.service as email
+import app.security.security_monitor as sm
+import app.tools.workspace_monitor as wsm
+import app.tools.git_inspector as gi
+import app.tools.desktop_observer as do
+import app.tools.browser_observer as bo
+import app.tools.terminal_inspector as ti
+import app.tools.log_inspector as li
+import app.tools.workspace_inspector as wi
+import app.tools.comms_observer as co
+import app.tools.email_observer as eo
+import app.tools.calendar_observer as cao
+from app.agent import task_commitments as tc
+from app.memory import task_ledger as tl
+from app.agent import approval_authority as aa
+from app.security import recovery_manager as rm
+from app.security import security_scanner as sc
+
+def keys(obj, depth=1):
+    if not isinstance(obj, dict):
+        return repr(obj)[:40]
+    return sorted(obj.keys())
+
+def main():
+    print("== CAL provider_observatory ==")
+    r = cal.provider_observatory(provider_name="fixture")
+    print("top:", sorted(r.keys()))
+    ev = (r.get("events") or [{}])[0]
+    print("event keys:", sorted(ev.keys()))
+    print("upcoming[0] keys:", sorted(((r.get("upcoming") or [{}])[0]).keys()))
+    dc = (r.get("deadline_candidates") or [{}])[0]
+    print("deadline_candidate keys:", sorted(dc.keys()))
+    print("conflicts[0] keys:", sorted(((r.get("conflicts") or [{}])[0]).keys()))
+
+    print("\n== EMAIL email_observatory ==")
+    r = email.email_observatory(provider_name="fixture")
+    print("top:", sorted(r.keys()))
+    msg = (r.get("messages") or [{}])[0]
+    print("message keys:", sorted(msg.keys()))
+    print("classifications[0] keys:", sorted(((r.get("classifications") or [{}])[0]).keys()))
+
+    print("\n== COMMS communication_observatory ==")
+    r = comms.communication_observatory(provider_name="comms")
+    print("top:", sorted(r.keys()))
+    msg = (r.get("messages") or [{}])[0]
+    print("message keys:", sorted(msg.keys()))
+
+    print("\n== TASK get_task (fixture) ==")
+    created = tl.create_task("attention-fixture objective", status="CREATED", priority="NORMAL")
+    tid = created["task_id"]
+    got = tl.get_task(tid)
+    print("task keys:", sorted(got.keys()))
+    print("sample statuses:", tl.TASK_STATUSES)
+
+    print("\n== APPROVALS ==")
+    print("create_approval params OK; pending:", len(aa.list_pending_approvals()))
+
+    print("\n== WORKSPACE detect_workspace_events ==")
+    r = wsm.detect_workspace_events("workspace")
+    print("top:", sorted(r.keys()))
+
+    print("\n== GIT inspect_git_repository ==")
+    r = gi.inspect_git_repository("workspace")
+    print("top:", sorted(r.keys()))
+
+    print("\n== SECURITY recent/global ==")
+    monitor = sm.global_security_monitor()
+    print("recent_events[0] keys:", sorted((monitor.recent_events(2)[0] if monitor.recent_events(2) else {}).keys()))
+    from app.security.security_monitor import build_health_snapshot
+    print("has build_health_snapshot:", callable(build_health_snapshot))
+
+    print("\n== TERMINAL_INSPECTOR analyze ==")
+    r = ti.analyze_terminal_output("")
+    print("top:", sorted(r.keys()))
+
+    print("\n== LOG_INSPECTOR ==")
+    r = li.inspect_log_file("workspace", "")
+    print("top:", sorted(r.keys()))
+
+    print("\n== WORKSPACE_INSPECTOR ==")
+    r = wi.inspect_workspace()
+    print("top:", sorted(r.keys()))
+
+    print("\n== COMMS_OBSERVER observe_comms ==")
+    r = co.observe_comms("comms")
+    print("top:", sorted(r.keys()))
+
+    print("\n== EMAIL_OBSERVER observe_email ==")
+    r = eo.observe_email("fixture")
+    print("top:", sorted(r.keys()))
+
+    print("\n== CALENDAR_OBSERVER observe_calendar ==")
+    r = cao.observe_calendar("fixture")
+    print("top:", sorted(r.keys()))
+
+    print("\n== RECOVERY evaluate_recovery decision ==")
+    print("signature params: task_id, current_state, workspace_root, db_path")
+
+    print("\n== SECURITY SCANNER ==")
+    import inspect
+    print([n for n in dir(sc) if not n.startswith("_")][:60])
+
+if __name__ == "__main__":
+    main()

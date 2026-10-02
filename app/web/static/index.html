@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>NEXUS · Local Autonomous Computer Intelligence</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="NEXUS navigation">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">N</div>
+        <div class="brand-text">
+          <strong>NEXUS</strong>
+          <small>Local Autonomous Computer Intelligence</small>
+        </div>
+      </div>
+      <nav class="nav">
+        <div class="nav-label">CONTROL</div>
+        <a href="#/dashboard" class="nav-item" data-view="dashboard">Dashboard</a>
+        <a href="#/tasks" class="nav-item" data-view="tasks">Tasks</a>
+        <a href="#/browser" class="nav-item" data-view="browser">Browser</a>
+        <a href="#/workspace" class="nav-item" data-view="workspace">Workspace</a>
+        <a href="#/email" class="nav-item" data-view="email">Email</a>
+        <a href="#/calendar" class="nav-item" data-view="calendar">Calendar</a>
+        <a href="#/applications" class="nav-item" data-view="applications">Applications</a>
+        <a href="#/security" class="nav-item" data-view="security">Security</a>
+        <a href="#/activity" class="nav-item" data-view="activity">Activity</a>
+      </nav>
+      <div class="approval-badge">
+        <a href="#/tasks" id="approval-summary" class="badge neutral">Approvals · —</a>
+      </div>
+      <div class="sidebar-foot">
+        <span class="foot-label">BOUNDARY</span>
+        <span class="foot-value" id="boundary-value">LOCAL · 127.0.0.1</span>
+        <span class="foot-note">Risk, approval, and execution gates remain active.</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="connection" id="connection-indicator">
+          <span class="pulse" aria-hidden="true"></span>
+          <span id="connection-text">CONNECTING</span>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-service-refresh" class="button ghost" type="button">Refresh</button>
+          <button id="btn-service-start" class="button ghost" type="button">Start service</button>
+          <button id="btn-service-stop" class="button ghost" type="button">Stop service</button>
+        </div>
+      </header>
+
+      <section id="view-dashboard" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / CONTROL</div>
+            <h1>Dashboard</h1>
+            <p class="view-sub">Live local state for the autonomous computer intelligence.</p>
+          </div>
+        </div>
+
+        <div class="health-strip" id="health-strip">
+          <div class="health-chip"><span class="chip-label">Service</span><strong id="chip-service">—</strong></div>
+          <div class="health-chip"><span class="chip-label">Health</span><strong id="chip-health">—</strong></div>
+          <div class="health-chip"><span class="chip-label">Resources</span><strong id="chip-resources">—</strong></div>
+          <div class="health-chip"><span class="chip-label">Pending approvals</span><strong id="chip-approvals">0</strong></div>
+          <div class="health-chip"><span class="chip-label">Recovery</span><strong id="chip-recovery">0</strong></div>
+        </div>
+
+        <section class="composer card">
+          <label class="composer-label" for="task-input">What should NEXUS do?</label>
+          <textarea id="task-input" rows="3" placeholder="Ask NEXUS to inspect your workspace, find deadlines, analyze an error, or investigate a webpage..." aria-label="Natural language task"></textarea>
+          <div class="composer-actions">
+            <button id="btn-run-task" class="button primary" type="button">Run task</button>
+            <span id="composer-status" class="composer-status muted" role="status"></span>
+          </div>
+        </section>
+
+        <div class="metric-grid" id="dashboard-metrics"></div>
+
+        <div class="split-grid">
+          <article class="card">
+            <div class="card-head"><h2>Current task</h2><span class="tag" id="current-task-tag">NONE</span></div>
+            <div id="current-task-panel" class="panel-body empty-text">No active task.</div>
+          </article>
+          <article class="card">
+            <div class="card-head"><h2>Pending approvals</h2><span class="tag neutral" id="pending-approvals-tag">0</span></div>
+            <div id="dashboard-approvals" class="panel-body empty-text">No approvals awaiting a decision.</div>
+          </article>
+        </div>
+
+        <div class="split-grid lower">
+          <article class="card">
+            <div class="card-head"><h2>Recent activity</h2><span class="tag">AUDIT</span></div>
+            <div id="dashboard-activity" class="activity-list"></div>
+          </article>
+          <article class="card">
+            <div class="card-head"><h2>Security posture</h2><span class="tag" id="security-tag">—</span></div>
+            <div id="security-summary" class="panel-body"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="view-tasks" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / EXECUTION</div>
+            <h1>Tasks</h1>
+            <p class="view-sub">Submit requests and follow them through the existing NEXUS pipeline.</p>
+          </div>
+        </div>
+
+        <section class="composer card">
+          <label class="composer-label" for="task-input-2">What should NEXUS do?</label>
+          <textarea id="task-input-2" rows="2" placeholder="e.g. inspect my workspace, check git status, or find my deadlines" aria-label="Natural language task"></textarea>
+          <div class="composer-actions">
+            <button id="btn-run-task-2" class="button primary" type="button">Run task</button>
+            <span id="composer-status-2" class="composer-status muted" role="status"></span>
+          </div>
+        </section>
+
+        <div class="card">
+          <div class="card-head">
+            <h2>Task list</h2>
+            <select id="task-filter" class="select filter-select" aria-label="Filter tasks by status">
+              <option value="">All statuses</option>
+              <option>CREATED</option>
+              <option>RUNNING</option>
+              <option>WAITING_APPROVAL</option>
+              <option>VERIFYING</option>
+              <option>PAUSED</option>
+              <option>COMPLETED</option>
+              <option>FAILED</option>
+              <option>BLOCKED</option>
+              <option>CANCELLED</option>
+            </select>
+          </div>
+          <div id="task-list" class="task-list"></div>
+        </div>
+
+        <div id="task-detail" class="card detail-card" hidden></div>
+      </section>
+
+      <section id="view-browser" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / OBSERVATION</div>
+            <h1>Browser</h1>
+            <p class="view-sub">Observation capabilities are available inside NEXUS core.</p>
+          </div>
+        </div>
+        <div class="capability-banner card">
+          <strong>Capability available through NEXUS core. Web integration pending.</strong>
+          <p>This step provides the interface foundation only. No unrestricted browser clicking, DOM manipulation, script execution, or credential entry is exposed through the web surface.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Browser providers</h2><span class="tag neutral">STATUS</span></div>
+          <div id="browser-providers" class="provider-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Browser observation shell</h2>
+              <p class="muted small">Shown once NEXUS core observation data is exposed locally.</p>
+            </div>
+            <span class="tag">SHELL</span>
+          </div>
+          <div class="observation-grid" id="browser-observation">
+            <div><span class="field-label">Observation</span><span class="field-value muted">Not available</span></div>
+            <div><span class="field-label">Page</span><span class="field-value muted">Not available</span></div>
+            <div><span class="field-label">URL</span><span class="field-value muted">Not available</span></div>
+            <div><span class="field-label">Title</span><span class="field-value muted">Not available</span></div>
+            <div><span class="field-label">Headings</span><span class="field-value muted">Not available</span></div>
+            <div><span class="field-label">Links</span><span class="field-value muted">Not available</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-workspace" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / LOCAL FILES</div>
+            <h1>Workspace</h1>
+            <p class="view-sub">Monitored workspace, events, and Git state from the existing NEXUS tools.</p>
+          </div>
+        </div>
+        <div id="workspace-panels" class="panel-body">Loading workspace state…</div>
+      </section>
+
+      <section id="view-email" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / COMMUNICATION</div>
+            <h1>Email</h1>
+            <p class="view-sub">Email providers are configuration-dependent.</p>
+          </div>
+        </div>
+        <div class="capability-banner card">
+          <strong>Real email providers require configuration.</strong>
+          <p>No live external connectivity is claimed. Fixture/mock providers remain capability-authorized; real providers report their actual configuration state.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Email providers</h2><span class="tag neutral">STATUS</span></div>
+          <div id="email-providers" class="provider-list"></div>
+        </div>
+      </section>
+
+      <section id="view-calendar" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / SCHEDULE</div>
+            <h1>Calendar</h1>
+            <p class="view-sub">Calendar providers are configuration-dependent.</p>
+          </div>
+        </div>
+        <div class="capability-banner card">
+          <strong>Real calendar providers require configuration.</strong>
+          <p>No live external connectivity is claimed. Fixture/mock providers remain capability-authorized; real providers report their actual configuration state.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Calendar providers</h2><span class="tag neutral">STATUS</span></div>
+          <div id="calendar-providers" class="provider-list"></div>
+        </div>
+      </section>
+
+      <section id="view-applications" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / CAREER</div>
+            <h1>Applications</h1>
+            <p class="view-sub">Job search and application capabilities are fixture/mock-only unless configured.</p>
+          </div>
+        </div>
+        <div class="capability-banner card">
+          <strong>Job providers remain fixture/mock-only unless configured.</strong>
+          <p>Consequential application submission continues to require human approval through the existing approval authority.</p>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Job search providers</h2><span class="tag neutral">STATUS</span></div>
+          <div id="job-search-providers" class="provider-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Application providers</h2><span class="tag neutral">STATUS</span></div>
+          <div id="application-providers" class="provider-list"></div>
+        </div>
+      </section>
+
+      <section id="view-security" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / POSTURE</div>
+            <h1>Security</h1>
+            <p class="view-sub">Status from the existing security monitor, approval system, and runtime containment.</p>
+          </div>
+        </div>
+        <div class="metric-grid">
+          <article class="metric"><span>Security</span><strong id="security-health">—</strong><small>Overall security posture</small></article>
+          <article class="metric"><span>Runtime</span><strong id="security-runtime">—</strong><small>Execution containment</small></article>
+          <article class="metric"><span>Audit</span><strong id="security-audit">—</strong><small>Audit system</small></article>
+          <article class="metric"><span>Scanner</span><strong id="security-scanner">—</strong><small>Security scanner</small></article>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Security events</h2><span class="tag">RECENT</span></div>
+          <div id="security-events" class="event-list"></div>
+        </div>
+        <p class="notice">A clean posture does not guarantee that the system is completely safe.</p>
+      </section>
+
+      <section id="view-activity" class="view">
+        <div class="view-head">
+          <div>
+            <div class="eyebrow">NEXUS / TRACE</div>
+            <h1>Activity</h1>
+            <p class="view-sub">Recent audit and autonomous events from the existing record.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Audit trail</h2><span class="tag">BACKED</span></div>
+          <div id="activity-list" class="activity-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h2>Autonomous events</h2><span class="tag">SERVICE</span></div>
+          <div id="autonomous-events" class="event-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

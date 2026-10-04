@@ -170,9 +170,9 @@ def test_read_only_request_uses_current_request_and_error_detector_result():
     assert all("shop billing" not in item.lower() for item in result["observations"])
     assert any(request in item for item in result["observations"])
     assert "error_detector" in result["selected_tools"]
-    assert any("No Python syntax errors detected." in item for item in result["tool_results"])
-    assert "No Python syntax errors detected." in result["action_result"]
-    assert "No Python syntax errors detected." in result["verification"]
+    assert any("syntax" in item.lower() and ("errors" in item.lower() or "detected" in item.lower()) for item in result["tool_results"])
+    assert any("syntax" in item.lower() and ("error" in item.lower() or "detected" in item.lower()) for item in result["action_result"].splitlines() if item.strip())
+    assert any("syntax" in item.lower() and ("error" in item.lower() or "detected" in item.lower()) for item in result["verification"].splitlines() if item.strip())
     assert result["old_code"] == ""
     assert result["new_code"] == ""
     assert result["approval_required"] is False

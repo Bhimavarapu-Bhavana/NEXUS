@@ -92,6 +92,7 @@ class NexusState(TypedDict):
     adaptation_history: list[dict[str, Any]]
     completion_evidence: list[str]
     environment_fingerprint: str
+    workspace_root: str
     _phase32_subgoal_success: bool
     _phase32_subgoal_outcome: str
     phase32_loop_steps: int

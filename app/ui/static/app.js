@@ -184,8 +184,39 @@ async function renderAudit() {
   if (!(data.events || []).length) node.append(el('div', 'No audit events yet.', 'empty'));
 }
 
+async function renderWorkspace() {
+  const statusNode = document.getElementById('workspace-status'); if (!statusNode) return; clear(statusNode);
+  const eventsNode = document.getElementById('workspace-events'); if (!eventsNode) return; clear(eventsNode);
+  try {
+    const status = await getJson('/api/workspace/status');
+    const root = text(status.workspace_root, 'workspace');
+    statusNode.append(el('div', `Current workspace root: ${root}`, 'workspace-status-line'));
+    const authResult = await getJson('/api/workspace');
+    const ws = text(authResult.workspace, '—');
+    statusNode.append(el('div', `Authorized workspace: ${ws}`, 'workspace-status-line'));
+    const recent = await getJson('/api/audit');
+    const wsEvents = (recent.events || []).filter(e => e.event_type in ('workspace_authorized', 'workspace_switched'));
+    if (wsEvents.length) {
+      eventsNode.append(el('strong', `Recent workspace events (${wsEvents.length})`));
+      wsEvents.slice(0, 10).forEach(event => {
+        const row = el('div', undefined, 'activity-row');
+        row.append(el('small', text(event.timestamp)));
+        row.append(el('strong', text(event.event_type)));
+        const meta = event.metadata || {};
+        row.append(el('small', `${text(meta.authorized_path)} reason:${text(meta.reason)}`));
+        eventsNode.append(row);
+      });
+    } else {
+      eventsNode.append(el('div', 'No workspace authorization events yet.', 'empty'));
+    }
+  } catch (error) {
+    statusNode.append(el('div', 'Workspace status unavailable.', 'empty'));
+    eventsNode.append(el('div', 'Workspace events unavailable.', 'empty'));
+  }
+}
+
 async function refreshAll() {
-  try { await Promise.all([renderStatus(), renderSecurity(), renderActivity(), renderEvidence(), renderApprovals(), renderAudit(), renderTaskCurrent(), renderTaskHistory(), renderDna()]); }
+  try { await Promise.all([renderStatus(), renderSecurity(), renderActivity(), renderEvidence(), renderApprovals(), renderAudit(), renderTaskCurrent(), renderTaskHistory(), renderDna(), renderWorkspace()]); }
   catch (error) { console.warn('NEXUS UI refresh failed', error); }
 }
 document.getElementById('refresh').addEventListener('click', refreshAll);

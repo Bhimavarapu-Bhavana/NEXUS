@@ -1,11 +1,76 @@
-.venv/
+# Python
 __pycache__/
-.pytest_cache/
-*.pyc
+*.py[cod]
 *.pyo
-*.db
-*.sqlite
-*.sqlite3
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+.aider-venv/
+
+# Test/cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment/secrets
 .env
 .env.*
 !.env.example
+
+# Local databases / runtime state
+*.db
+*.sqlite
+*.sqlite3
+data/
+*.log
+
+# Local AI/tool caches
+.aider.tags.cache.v4/
+.aider.chat.history.md
+.aider.input.history
+
+# Temporary/debug output
+ERROR.TXT
+OUTPUT.TXT
+stderr.txt
+stdout.txt
+results.txt
+test_output.txt
+test_results.txt
+full_suite_results.txt
+pytest_full_summary.txt
+git_status_before.txt
+
+# Temporary debug scripts
+check_assertions.py
+check_browser.py
+debug_db.py
+debug_phase32.py
+debug_test.py
+diag2.py
+diag_v2.py
+find_workspace_files.py
+fix_test.py
+fix_test2.py
+phase32_test.py
+search_shop.py
+trace2.py
+trace_approval.py
+verify_1.py
+verify_ assertions.py
+_intel43.py.deprecated
+
+# Temporary test workspace
+__test_workspace/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Local workspace secrets
+workspace/secret.txt

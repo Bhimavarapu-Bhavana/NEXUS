@@ -1,0 +1,17 @@
+# Sample text file for NEXUS workspace tests
+# Used by various workspace inspection and security scanning tools
+This is a sample document for demonstrating workspace inspection capabilities.
+The file contains sample content that can be analyzed for security threats,
+sensitive data exposure, or runtime issues.
+
+Key sections:
+- Configuration settings
+- Operational parameters
+- Security considerations
+- Performance metrics
+
+Sample data fields:
+- hostname: server1.example.com
+- port: 443
+- protocol: HTTPS
+- timeout: 30 seconds

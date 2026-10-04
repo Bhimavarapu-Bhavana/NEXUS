@@ -370,6 +370,7 @@ class TaskRunner:
         state.setdefault("scope_db_path", self.scope_db_path)
         state.setdefault("dna_db_path", self.dna_db_path)
         state.setdefault("environment_fingerprint", self.workspace_root)
+        state.setdefault("workspace_root", self.workspace_root)
         state.setdefault("autonomous_execution_enabled", True)
         state.setdefault("capability_context", {})
         state.setdefault("subgoal_contexts", {})
@@ -499,7 +500,9 @@ class TaskRunner:
         if task is None:
             raise ValueError(f"Task {task_id} was not found.")
         status = str(task.get("status") or "").upper()
-        if status in TERMINAL_TASKS or status in {"WAITING_APPROVAL", "VERIFYING"}:
+        if status in TERMINAL_TASKS:
+            return self._normalize_task_result(task_id, task)
+        if status == "WAITING_APPROVAL" and not task.get("approval_id"):
             return self._normalize_task_result(task_id, task)
 
         base_state = {

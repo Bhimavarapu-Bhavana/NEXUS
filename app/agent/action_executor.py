@@ -326,7 +326,7 @@ def execute_authorized_action(state: dict[str, Any], *, workspace_root: str = "w
             result_payload = function(
                 state.get("action_spec") or {},
                 observed,
-                approved=True,
+                approved=state.get("approval_id") is not None,
                 action_count=0,
                 revalidator=state.get("browser_revalidator"),
                 capability_context=state.get("capability_context"),
@@ -334,7 +334,7 @@ def execute_authorized_action(state: dict[str, Any], *, workspace_root: str = "w
         elif tool_name.startswith("browser_"):
             function = ACTION_FUNCTIONS[tool_name]
             observed = state.get("observed_page") or next((item.get("result") for item in state.get("observation_results", []) if item.get("tool") == "browser_observer"), {})
-            result_payload = function(state.get("action_spec") or {}, observed, approved=True, action_count=0, revalidator=state.get("browser_revalidator"))
+            result_payload = function(state.get("action_spec") or {}, observed, approved=state.get("approval_id") is not None, action_count=0, revalidator=state.get("browser_revalidator"))
         elif tool_name.startswith("desktop_"):
             function = ACTION_FUNCTIONS[tool_name]
             observed = state.get("observed_desktop") or next((item.get("result") for item in state.get("observation_results", []) if item.get("tool") == "desktop_observer"), {})

@@ -14,10 +14,12 @@ manual tool selection.
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from collections import Counter
 from datetime import datetime, timezone
+import threading
 from pathlib import Path
 from typing import Any, Callable
 
@@ -788,9 +790,14 @@ def _render(output: dict[str, Any]) -> str:
     return json.dumps(output, ensure_ascii=True, indent=2, default=str)
 
 
+_server_thread_started = False
+
+
 def run_cli(argv: list[str] | None = None) -> int:
+    global _server_thread_started
     args = list(sys.argv[1:] if argv is None else argv)
-    plane = ControlPlane()
+    db_path = os.environ.get("NEXUS_DB_PATH")
+    plane = ControlPlane(db_path=db_path) if db_path else ControlPlane()
     if args:
         line = " ".join(args).strip()
         print(_render(plane.handle(line)))
@@ -802,6 +809,14 @@ def run_cli(argv: list[str] | None = None) -> int:
     else:
         state = str(started.get("result", {}).get("state") or "RUNNING")
         print(f"[NEXUS Control Plane] Service is now {state}. Type a control command or any request. Type 'exit' to quit.")
+    if not _server_thread_started:
+        server_thread = threading.Thread(
+            target=run_server,
+            args=("127.0.0.1", 8770, plane),
+            daemon=True,
+        )
+        server_thread.start()
+        _server_thread_started = True
     while True:
         try:
             line = input("NEXUS> ").strip()

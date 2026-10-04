@@ -163,6 +163,77 @@ def test_permitted_read_only_task_still_works():
     assert result["final_outcome"] != "BLOCKED"
 
 
+def test_stategraph_blocks_consequential_task_without_permission(tmp_path, monkeypatch):
+    """Full nexus_graph.invoke path: bound store with no grant fails closed."""
+    dbs = _dbs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "workspace").mkdir()
+    (tmp_path / "workspace" / "demo.py").write_text('print("before")\n', encoding="utf-8")
+    create_task('Fix demo.py to print "hello".', task_id=TASK_ID, db_path=dbs["persistence"])
+    result = nexus_graph.invoke(
+        {
+            "user_request": 'Fix demo.py to print "hello".',
+            "observations": [],
+            "investigation": [],
+            "selected_tools": [],
+            "selected_files": [],
+            "observation_results": [],
+            "approval_required": False,
+            "approved": False,
+            "retry_count": 0,
+            "monitoring_active": False,
+            "decision_stage": "REQUEST",
+            "task_id": TASK_ID,
+            "persistence_db_path": str(dbs["persistence"]),
+            "journal_db_path": str(dbs["journal"]),
+            "approval_db_path": str(dbs["approvals"]),
+            "permission_db_path": str(dbs["permissions"]),
+        }
+    )
+    assert result["final_outcome"] == "BLOCKED"
+    assert result["permission_decision"]["outcome"] == "UNKNOWN_CAPABILITY"
+    assert result["approval_required"] is False
+    assert result["approved"] is False
+    assert not result.get("approval_id")
+    assert (tmp_path / "workspace" / "demo.py").read_text(encoding="utf-8") == 'print("before")\n'
+
+
+def test_stategraph_with_grant_still_stops_at_approval(tmp_path, monkeypatch):
+    """Full nexus_graph.invoke path: a grant reaches approval, never execution."""
+    dbs = _dbs(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "workspace").mkdir()
+    (tmp_path / "workspace" / "demo.py").write_text('print("before")\n', encoding="utf-8")
+    create_task('Fix demo.py to print "hello".', task_id=TASK_ID, db_path=dbs["persistence"])
+    record = _grant(tmp_path, dbs)
+    result = nexus_graph.invoke(
+        {
+            "user_request": 'Fix demo.py to print "hello".',
+            "observations": [],
+            "investigation": [],
+            "selected_tools": [],
+            "selected_files": [],
+            "observation_results": [],
+            "approval_required": False,
+            "approved": False,
+            "retry_count": 0,
+            "monitoring_active": False,
+            "decision_stage": "REQUEST",
+            "task_id": TASK_ID,
+            "persistence_db_path": str(dbs["persistence"]),
+            "journal_db_path": str(dbs["journal"]),
+            "approval_db_path": str(dbs["approvals"]),
+            "permission_db_path": str(dbs["permissions"]),
+        }
+    )
+    assert result["permission_decision"]["outcome"] == "APPROVAL_REQUIRED"
+    assert result["permission_id"] == record["permission_id"]
+    assert result["approval_required"] is True
+    assert result["approved"] is False
+    assert result["final_outcome"] == "APPROVAL_REQUIRED"
+    assert (tmp_path / "workspace" / "demo.py").read_text(encoding="utf-8") == 'print("before")\n'
+
+
 def test_unknown_capability_blocked_when_store_bound(tmp_path):
     dbs = _dbs(tmp_path)
     state = {"task_id": TASK_ID, "permission_db_path": str(dbs["permissions"]), "risk_decision": {}}

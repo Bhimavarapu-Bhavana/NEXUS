@@ -320,6 +320,31 @@ def test_recovery_cannot_broaden_scope(tmp_path):
     assert second["scope_decision"]["outcome"] == "DENIED"
 
 
+def test_cross_application_scope_cannot_broaden(tmp_path):
+    dbs = _dbs(tmp_path)
+    # Workspace application is fully permitted: permission and scope both granted.
+    _grant_permission(dbs)
+    _grant_scope(dbs)
+
+    # A browser tool must not ride on the workspace grant.
+    browser_scope = {"task_id": TASK_ID, "scope_db_path": str(dbs["scopes"]), "risk_decision": {}}
+    assert _evaluate_automation_scope(browser_scope, tool_name="browser_follow_observed_link", target="https://example.com/x") is False
+    assert browser_scope["scope_decision"]["outcome"] == "DENIED"
+    assert browser_scope["final_outcome"] == "BLOCKED"
+
+    # The workspace-only permission does not match a remote browser target.
+    browser_permission = {"task_id": TASK_ID, "permission_db_path": str(dbs["permissions"]), "risk_decision": {}}
+    assert _evaluate_action_permission(browser_permission, tool_name="browser_follow_observed_link", target="https://example.com/x") is False
+    assert browser_permission["permission_decision"]["outcome"] in {"OUT_OF_SCOPE", "UNKNOWN_CAPABILITY"}
+
+    # Granting the browser area does not broaden to email either.
+    _grant_scope(dbs, area="browser", decision="ALLOW")
+    email_scope = {"task_id": TASK_ID, "scope_db_path": str(dbs["scopes"]), "risk_decision": {}}
+    assert _evaluate_automation_scope(email_scope, tool_name="email_send_action", target="msg-1") is False
+    assert email_scope["scope_decision"]["outcome"] == "DENIED"
+    assert email_scope["final_outcome"] == "BLOCKED"
+
+
 def test_permission_and_scope_both_required(tmp_path):
     dbs = _dbs(tmp_path)
     _grant_permission(dbs)

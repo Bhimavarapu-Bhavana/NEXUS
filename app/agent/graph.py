@@ -265,7 +265,7 @@ def monitor_workspace(state: NexusState):
     if not state.get("monitoring_active", False):
         return state
 
-    monitor = WorkspaceMonitor(workspace_path="workspace")
+    monitor = WorkspaceMonitor(workspace_path=_workspace_root(state))
     monitor.start()
     events = monitor.poll_events()
     monitor.stop()
@@ -341,7 +341,25 @@ def _classify_request_intent(request: str, constraints: dict[str, bool] | None =
     return "READ_ONLY_UNDERSTANDING"
 
 
-def _target_hash(target: str, workspace_root: str = "workspace") -> str:
+DEFAULT_WORKSPACE_ROOT = "workspace"
+
+
+def _workspace_root(state: NexusState) -> str:
+    """Resolve the authorized workspace root for tool dispatch.
+
+    TaskRunner records the operator-configured root in ``workspace_root`` so
+    every inspector and executor is confined to exactly that root instead of a
+    hardcoded relative directory. Every containment check (is_authorized_path,
+    git_inspector repository scoping, fixer/runtime_inspector root checks) still
+    applies against the returned value, so widening the configured root is the
+    operator's explicit authorization and never relaxes the inspectors.
+    """
+
+    root = str(state.get("workspace_root") or "").strip()
+    return root or DEFAULT_WORKSPACE_ROOT
+
+
+def _target_hash(target: str, workspace_root: str = DEFAULT_WORKSPACE_ROOT) -> str:
     path = (Path(workspace_root) / target).resolve()
     if not path.is_file():
         return ""
@@ -726,7 +744,7 @@ def select_relevant(state: NexusState):
         return state
 
     result = select_relevant_files(
-        workspace_path="workspace",
+        workspace_path=_workspace_root(state),
         user_request=state["user_request"],
         max_files=10,
     )
@@ -774,7 +792,7 @@ def investigate(state: NexusState):
 
     results = execute_selected_tools(
         chosen_tools,
-        workspace_path="workspace",
+        workspace_path=_workspace_root(state),
         user_request=state["user_request"],
         file_name=(state.get("selected_files") or [""])[0],
         file_names=state.get("selected_files", []),
@@ -964,7 +982,7 @@ def _deferred_browser_observation(state: NexusState) -> dict[str, object] | None
         return None
     results = execute_selected_tools(
         ["browser_observer"],
-        workspace_path="workspace",
+        workspace_path=_workspace_root(state),
         user_request=state.get("user_request", ""),
         file_name="",
         file_names=[],
@@ -983,7 +1001,7 @@ def _deferred_desktop_observation(state: NexusState) -> dict[str, object] | None
     exists yet. Read-only grounding only; fail closed."""
     results = execute_selected_tools(
         ["desktop_observer"],
-        workspace_path="workspace",
+        workspace_path=_workspace_root(state),
         user_request=state.get("user_request", ""),
         file_name="",
         file_names=[],
@@ -1019,6 +1037,107 @@ _FOLLOW_DIRECTIVE_TERMS = (
 def _is_explicit_follow_request(request: str) -> bool:
     lower = str(request or "").lower()
     return any(term in lower for term in _FOLLOW_DIRECTIVE_TERMS)
+
+
+_LINK_TARGET_NOUNS = ("link", "links", "section", "sections", "page", "pages", "tab", "tabs", "anchor", "anchors")
+
+_QUOTED_LINK_LABEL_PATTERN = re.compile(r"[\"'“”]([^\"'“”]{1,60})[\"'“”]", re.IGNORECASE)
+
+_NAMED_LINK_LABEL_PATTERN = re.compile(
+    r"\b(?:the|a|an)\s+([A-Za-z0-9][\w'&.+-]*(?:\s+[A-Za-z0-9][\w'&.+-]*){0,2})\s+(?:"
+    + "|".join(_LINK_TARGET_NOUNS)
+    + r")\b",
+    re.IGNORECASE,
+)
+
+_NON_LABEL_WORDS = frozenset({
+    "the", "a", "an", "that", "this", "those", "these", "it", "its", "there",
+    "you", "your", "they", "their", "we", "our", "one", "two", "some", "any",
+    "each", "every", "all", "both", "either", "neither", "other", "another",
+    "such", "only", "own", "same",
+    "observe", "observed", "observes", "see", "seen", "actually", "really",
+    "can", "could", "will", "would", "should", "have", "has", "had", "been",
+    "being", "listed", "present", "available", "matching", "matched",
+    "corresponding", "ground", "grounded", "click", "clicked", "follow",
+    "followed", "open", "opened", "navigate", "navigated", "take", "taken",
+    "first", "second", "third", "last", "next", "previous", "real", "actual",
+    "exact", "right", "correct", "proper", "appropriate", "desired",
+    "requested", "named", "chosen", "selected", "given", "provided",
+    "current", "new", "old", "top", "bottom", "main", "left", "whole",
+    "entire", "single", "sole", "above", "below",
+    "link", "links", "section", "sections", "page", "pages", "tab", "tabs",
+    "anchor", "anchors", "website", "site", "url", "browser", "chrome",
+})
+
+MAX_LINK_LABEL_WORDS = 4
+
+
+def _normalize_link_label(value: object) -> str:
+    """Reduce a link label or observed link text to comparable plain words."""
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", str(value or "").lower()).split())
+
+
+def _is_generic_link_label(label: str) -> bool:
+    """Reject directives that name no specific link.
+
+    Generic navigation wording ("the first link you observe", "the observed
+    link", "the next page") carries no link identity, so it must keep the
+    existing first-observed-link behavior rather than becoming a match key.
+    """
+    words = _normalize_link_label(label).split()
+    if not words or len(words) > MAX_LINK_LABEL_WORDS:
+        return True
+    return any(word in _NON_LABEL_WORDS for word in words)
+
+
+def _requested_link_labels(request: str) -> list[str]:
+    """Extract the distinct, specific link labels the user explicitly named."""
+    text = str(request or "")
+    if not text.strip() or not _is_explicit_follow_request(text):
+        return []
+    candidates = [match.group(1) for match in _QUOTED_LINK_LABEL_PATTERN.finditer(text)]
+    candidates.extend(match.group(1) for match in _NAMED_LINK_LABEL_PATTERN.finditer(text))
+    labels: list[str] = []
+    for candidate in candidates:
+        if _is_generic_link_label(candidate):
+            continue
+        normalized = _normalize_link_label(candidate)
+        if normalized and normalized not in labels:
+            labels.append(normalized)
+    return labels
+
+
+def _matching_observed_link_indexes(links: list, label: str) -> list[int]:
+    """Return observed link indexes whose text matches one requested label."""
+    normalized = _normalize_link_label(label)
+    exact: list[int] = []
+    partial: list[int] = []
+    for index, link in enumerate(links):
+        if not isinstance(link, dict) or not link.get("url"):
+            continue
+        text = _normalize_link_label(link.get("text") or "")
+        if normalized == text or normalized == _normalize_link_label(link.get("url") or ""):
+            exact.append(index)
+        elif normalized and text and (normalized in text or text in normalized):
+            partial.append(index)
+    return exact or partial
+
+
+def _resolve_observed_link(links: list, labels: list[str]) -> tuple[dict | None, int]:
+    """Resolve user-named link labels to exactly one observed link.
+
+    Returns the observed link and its real index. Returns (None, -1) when the
+    named target is absent from the observation or matches more than one link,
+    so the caller fails closed instead of substituting an unrelated link.
+    """
+    resolved: dict[int, dict] = {}
+    for label in labels:
+        for index in _matching_observed_link_indexes(links, label):
+            resolved.setdefault(index, links[index])
+    if len(resolved) != 1:
+        return None, -1
+    index = next(iter(resolved))
+    return resolved[index], index
 
 
 _REAL_BROWSER_DIRECTIVE_TERMS = (
@@ -1329,11 +1448,20 @@ def create_action_proposal(state: NexusState):
                 state["final_outcome"] = "NO_ACTION"
                 _set_decision(state, "FINAL_OUTCOME", reason="The browser request is read-only; an explicit directive to follow or click an observed link is required before navigation is proposed.", final_outcome="NO_ACTION")
                 return state
+            requested_labels = _requested_link_labels(state.get("user_request", ""))
+            if requested_labels:
+                link, link_index = _resolve_observed_link(links, requested_labels)
+                if link is None:
+                    state["final_outcome"] = "NO_ACTION"
+                    _set_decision(state, "FINAL_OUTCOME", reason=f"The requested browser target {', '.join(requested_labels)} was not present as a single observed link; no link was invented.", final_outcome="NO_ACTION")
+                    return state
+            else:
+                link_index = next((index for index, item in enumerate(links) if item is link), 0)
             state["action_tool"] = "browser_follow_observed_link"
             state["action_target"] = str(link["url"])
             state["action_spec"] = {
                 "action_type": "follow_observed_link",
-                "element_identifier": "link:0",
+                "element_identifier": f"link:{link_index}",
                 "observed_target": observed.get("final_url") or observed.get("url", ""),
                 "target_url": link["url"],
             }
@@ -1643,7 +1771,7 @@ NO_FIX
                 "apply approved code fix",
                 tool_name="fixer",
                 target_path=state.get("target_file", "workspace"),
-                workspace_root="workspace",
+                workspace_root=_workspace_root(state),
             )
             state["risk_decision"] = risk_decision
             state["approval_required"] = True
@@ -1726,7 +1854,7 @@ NO_FIX
         "apply approved code fix",
         tool_name="fixer",
         target_path=file_name,
-        workspace_root="workspace",
+        workspace_root=_workspace_root(state),
     )
     state["risk_decision"] = risk_decision
     if not _evaluate_action_permission(state, tool_name="fixer", target=file_name):
@@ -2100,7 +2228,7 @@ def execute_action(state: NexusState):
         "apply approved code fix",
         tool_name="fixer",
         target_path=state.get("target_file", ""),
-        workspace_root="workspace",
+        workspace_root=_workspace_root(state),
     )
     state["risk_decision"] = risk_decision
 
@@ -2227,7 +2355,7 @@ def evaluate_verification(state: NexusState):
         return "stop"
 
     runtime_result = run_python_file(
-        workspace_path="workspace",
+        workspace_path=_workspace_root(state),
         file_name=state["target_file"],
         timeout_seconds=30,
     )
@@ -2630,7 +2758,7 @@ def execute_phase32_subgoal(state: NexusState):
             })
     results = execute_selected_tools(
         passthrough_tools,
-        workspace_path="workspace",
+        workspace_path=_workspace_root(state),
         user_request=state.get("user_request", ""),
         file_name=(state.get("selected_files") or [""])[0],
         file_names=state.get("selected_files", []),

@@ -292,13 +292,171 @@ def create_app(
             return _json_response({"label": "HISTORICAL MEMORY", "items": []})
         return _json_response({"label": "HISTORICAL MEMORY", "items": [search_memory(query, limit=5)]})
 
+    def authorized_root() -> str:
+        return str(getattr(runner, "workspace_root", "") or "workspace")
+
+    @app.get("/api/workspace/status")
+    def api_workspace_status() -> Response:
+        return _json_response({"workspace_root": authorized_root()})
+
+    @app.post("/api/workspace/authorize")
+    def api_workspace_authorize() -> Response:
+        if runner is None:
+            return _json_response({"error": "Task runner unavailable."}, 503)
+        try:
+            body = request.get_json(silent=True)
+        except Exception:
+            return _json_response({"error": "Malformed payload."}, 400)
+        if not isinstance(body, dict):
+            return _json_response({"error": "JSON payload required."}, 400)
+        unknown = sorted(set(body) - {"path", "reason"})
+        if unknown:
+            return _json_response({"error": f"Unexpected fields: {', '.join(unknown)}."}, 400)
+        path = str(body.get("path") or "").strip()
+        reason = str(body.get("reason") or "").strip()
+        if not path:
+            return _json_response({"error": "A 'path' is required."}, 400)
+        if len(path) > 400:
+            return _json_response({"error": "Path is too long."}, 400)
+        if not reason:
+            return _json_response({"error": "A 'reason' is required."}, 400)
+        if len(reason) > 500:
+            return _json_response({"error": "Reason is too long."}, 400)
+        try:
+            from app.security.permission_authority import create_permission, evaluate_permission
+            from app.security.automation_scope import check_scope
+            from app.security.privacy_policy import describe_privacy_policy, evaluate_privacy
+        except Exception as exc:
+            return _json_response({"error": f"Security modules unavailable: {redact_text(str(exc))[:200]}"}, 503)
+        workspace_root = authorized_root()
+        scope_result = check_scope(
+            area="workspace-only",
+            task_id="ui_authorize",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if scope_result.get("status") == "denied":
+            return _json_response({"error": "Workspace path outside authorized scope.", "details": scope_result}, 403)
+        privacy_result = evaluate_privacy(
+            capability="workspace",
+            action_class="authorize",
+            target=path,
+            task_id="ui_authorize",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if privacy_result.get("status") == "denied":
+            return _json_response({"error": "Workspace path violates privacy policy.", "details": privacy_result}, 403)
+        perm_result = create_permission(
+            capability="WORKSPACE",
+            action_class="READ",
+            target_scope="workspace-only",
+            target_pattern=path,
+            task_id="ui_authorize",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if perm_result.get("status") != "ACTIVE":
+            return _json_response({"error": "Permission creation failed.", "details": perm_result}, 403)
+        check_result = check_permission_before_execution(
+            capability="workspace",
+            action_class="read",
+            target=path,
+            task_id="ui_authorize",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if check_result.get("status") != "granted":
+            return _json_response({"error": "Permission check failed.", "details": check_result}, 403)
+        task_id = str(getattr(runner, "current_task_id", "") or "ui_authorize")
+        runner.workspace_root = path
+        runner.state.setdefault("workspace_root", path)
+        from app.security.audit_logger import log_audit_event
+        log_audit_event(
+            event_type="workspace_authorized",
+            task_id=task_id,
+            status="success",
+            metadata={
+                "authorized_path": path,
+                "reason": reason,
+                "scope_verified": scope_result.get("status") == "granted",
+                "privacy_verified": privacy_result.get("status") == "granted",
+            },
+            db_path=getattr(runner, "db_path", None),
+        )
+        return _json_response({
+            "workspace_root": path,
+            "scope_verified": scope_result.get("status") == "granted",
+            "privacy_verified": privacy_result.get("status") == "granted",
+            "permission_id": perm_result.get("permission_id"),
+        })
+
+    @app.post("/api/workspace/use")
+    def api_workspace_use() -> Response:
+        if runner is None:
+            return _json_response({"error": "Task runner unavailable."}, 503)
+        try:
+            body = request.get_json(silent=True)
+        except Exception:
+            return _json_response({"error": "Malformed payload."}, 400)
+        if not isinstance(body, dict):
+            return _json_response({"error": "JSON payload required."}, 400)
+        unknown = sorted(set(body) - {"path"})
+        if unknown:
+            return _json_response({"error": f"Unexpected fields: {', '.join(unknown)}."}, 400)
+        path = str(body.get("path") or "").strip()
+        if not path:
+            return _json_response({"error": "A 'path' is required."}, 400)
+        current = authorized_root()
+        if path == current:
+            return _json_response({"workspace_root": path, "message": "Already active."})
+        workspace_root_val = path
+        scope_result = check_scope(
+            area="workspace-only",
+            task_id="ui_use",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if scope_result.get("status") == "denied":
+            return _json_response({"error": "Workspace path outside authorized scope.", "details": scope_result}, 403)
+        privacy_result = evaluate_privacy(
+            capability="workspace",
+            action_class="use",
+            target=path,
+            task_id="ui_use",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if privacy_result.get("status") == "denied":
+            return _json_response({"error": "Workspace path violates privacy policy.", "details": privacy_result}, 403)
+        check_result = check_permission_before_execution(
+            capability="workspace",
+            action_class="read",
+            target=path,
+            task_id="ui_use",
+            db_path=getattr(runner, "db_path", None),
+        )
+        if check_result.get("status") != "granted":
+            return _json_response({"error": "Permission check failed.", "details": check_result}, 403)
+        runner.workspace_root = path
+        runner.state.setdefault("workspace_root", path)
+        from app.security.audit_logger import log_audit_event
+        log_audit_event(
+            event_type="workspace_switched",
+            task_id=str(getattr(runner, "current_task_id", "") or "ui_use"),
+            status="success",
+            metadata={
+                "from_workspace": current,
+                "to_workspace": path,
+            },
+            db_path=getattr(runner, "db_path", None),
+        )
+        return _json_response({"workspace_root": path, "from": current, "message": "Workspace switched."})
+
     @app.get("/api/workspace")
     def api_workspace() -> Response:
-        return _json_response({"workspace": inspect_workspace("workspace")})
+        return _json_response({"workspace": inspect_workspace(authorized_root())})
 
     @app.get("/api/git")
     def api_git() -> Response:
-        return _json_response(inspect_git_repository("workspace"))
+        try:
+            return _json_response(inspect_git_repository(authorized_root()))
+        except ValueError as exc:
+            return _json_response({"error": redact_text(str(exc))[:200]}, 409)
 
     @app.get("/api/browser")
     def api_browser() -> Response:
@@ -469,10 +627,34 @@ def create_app(
     def request_too_large(_error: Any) -> Response:
         return _json_response({"error": "Request is too large."}, 413)
 
+    @app.errorhandler(404)
+    def not_found(_error: Any) -> Response:
+        return _json_response({"error": "Unknown endpoint."}, 404)
+
+    @app.errorhandler(405)
+    def method_not_allowed(_error: Any) -> Response:
+        return _json_response({"error": "Method is not allowed for this endpoint."}, 405)
+
+    @app.errorhandler(500)
+    def internal_error(_error: Any) -> Response:
+        """Fail safely instead of leaking a stack trace or local filesystem paths.
+
+        Read-only evidence endpoints such as /api/git and /api/workspace call
+        inspectors that raise ValueError when a containment or repository check
+        fails. Without this handler Flask returns a Werkzeug debug page that
+        exposes absolute paths and internals; the control plane already
+        returns a bounded JSON error for the same conditions.
+        """
+        return _json_response({"error": "Request failed safely; see the audit trail for details."}, 500)
+
     return app
 
 
-def run_server(host: str = UI_HOST, port: int = UI_PORT) -> None:
+def run_server(
+    host: str = UI_HOST,
+    port: int = UI_PORT,
+    workspace_root: str = "workspace",
+) -> None:
     if host not in {"127.0.0.1", "localhost"}:
         raise ValueError("NEXUS UI only binds to localhost.")
     from app.agent.task_runner import TaskRunner
@@ -481,7 +663,7 @@ def run_server(host: str = UI_HOST, port: int = UI_PORT) -> None:
     from app.security.user_dna import DEFAULT_DB_PATH as DNA_DB_PATH
 
     runner = TaskRunner(
-        workspace_root="workspace",
+        workspace_root=workspace_root,
         permission_db_path=PERMISSIONS_DB_PATH,
         scope_db_path=SCOPES_DB_PATH,
         dna_db_path=DNA_DB_PATH,
@@ -496,4 +678,19 @@ def run_server(host: str = UI_HOST, port: int = UI_PORT) -> None:
 
 
 if __name__ == "__main__":
-    run_server()
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(description="Run the local NEXUS UI.")
+    parser.add_argument("--host", default=UI_HOST)
+    parser.add_argument("--port", default=UI_PORT, type=int)
+    parser.add_argument(
+        "--workspace",
+        default="workspace",
+        help="Authorized workspace root. NEXUS is confined to this directory.",
+    )
+    args = parser.parse_args()
+    if args.host not in {"127.0.0.1", "localhost"}:
+        print(f"Refusing to bind to {args.host}; NEXUS is local-only.", file=sys.stderr)
+        raise SystemExit(2)
+    run_server(host=args.host, port=int(args.port), workspace_root=args.workspace)
